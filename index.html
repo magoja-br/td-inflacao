@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tesouro IPCA+ — Simulador</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Tailwind gray-50 */
+        }
+        .form-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db; /* Tailwind gray-300 */
+            background-color: #ffffff;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #3b82f6; /* Tailwind blue-500 */
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+        }
+        .btn {
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            color: white;
+            transition: background-color 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-primary {
+            background-color: #3b82f6; /* Tailwind blue-500 */
+        }
+        .btn-primary:hover {
+            background-color: #2563eb; /* Tailwind blue-600 */
+        }
+        .table-container {
+            max-height: 500px;
+            overflow: auto; /* Habilita scroll horizontal e vertical se necessário */
+            border: 1px solid #e5e7eb; /* Tailwind gray-200 */
+            border-radius: 0.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap; /* Impede que o texto da célula quebre */
+        }
+        thead th {
+            background-color: #f9fafb; /* Tailwind gray-50 */
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800 p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900">Tesouro IPCA+ — Simulador</h1>
+            <p class="text-gray-600 mt-2">Uma versão web interativa e responsiva do simulador v4.3.</p>
+        </header>
+
+        <form id="simuladorForm">
+            <!-- Modo de simulação -->
+            <div class="mb-6">
+                <label class="block text-lg font-semibold mb-3 text-gray-700">Modo de simulação</label>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <label class="flex items-center p-4 border rounded-lg cursor-pointer flex-1 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 transition-all">
+                        <input type="radio" id="modoSaques" name="modo" value="saques" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" checked>
+                        <span class="ml-3 text-gray-800">Saques mensais até acabar</span>
+                    </label>
+                    <label class="flex items-center p-4 border rounded-lg cursor-pointer flex-1 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 transition-all">
+                        <input type="radio" id="modoUnico" name="modo" value="unico" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
+                        <span class="ml-3 text-gray-800">Sem saques (resgate único no final)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Inputs principais -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div>
+                    <label for="saldo_inicial" class="block text-sm font-medium text-gray-700 mb-1">Saldo inicial (R$)</label>
+                    <input type="text" id="saldo_inicial" class="form-input" value="1.350.000,00">
+                </div>
+                <div>
+                    <label for="meses" class="block text-sm font-medium text-gray-700 mb-1">Meses de projeção (ex: 360,00)</label>
+                    <input type="text" id="meses" class="form-input" value="360,00">
+                </div>
+                 <div>
+                    <label for="ipca" class="block text-sm font-medium text-gray-700 mb-1">Inflação (IPCA) % a.a.</label>
+                    <input type="text" id="ipca" class="form-input" value="3,000">
+                </div>
+                <div>
+                    <label for="real" class="block text-sm font-medium text-gray-700 mb-1">Taxa real % a.a.</label>
+                    <input type="text" id="real" class="form-input" value="5,000">
+                </div>
+                <div>
+                    <label for="custodia" class="block text-sm font-medium text-gray-700 mb-1">Taxa de Custódia % a.a. (B3)</label>
+                    <input type="text" id="custodia" class="form-input" value="0,200">
+                </div>
+                <div>
+                    <label for="ir_modo" class="block text-sm font-medium text-gray-700 mb-1">Imposto de Renda</label>
+                    <select id="ir_modo" class="form-input">
+                        <option value="regressiva">Tabela regressiva (Receita Federal)</option>
+                        <option value="fixa">Alíquota fixa</option>
+                    </select>
+                </div>
+                <div id="aliquota_fixa_container" class="hidden">
+                     <label for="aliquota_fixa" class="block text-sm font-medium text-gray-700 mb-1">Alíquota fixa (%)</label>
+                    <input type="text" id="aliquota_fixa" class="form-input" value="15,000">
+                </div>
+            </div>
+            
+            <hr class="my-6">
+
+            <!-- Inputs modo saques -->
+            <div id="saquesContainer">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                        <label for="saque_inicial" class="block text-sm font-medium text-gray-700 mb-1">Saque mensal inicial (R$)</label>
+                        <input type="text" id="saque_inicial" class="form-input" value="7.900,00">
+                    </div>
+                    <div class="col-span-1 md:col-span-2 flex flex-col sm:flex-row sm:items-center gap-4 sm:pt-6">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="primeiro_saque_mes2" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                            <span class="ml-2 text-sm text-gray-700">1º saque no mês 2</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="corrigir_saque" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                            <span class="ml-2 text-sm text-gray-700">Corrigir saque pelo IPCA</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="parar_quando_acabar" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                            <span class="ml-2 text-sm text-gray-700">Parar quando saldo acabar</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" id="executarBtn" class="btn btn-primary w-full text-lg">
+                Executar simulação
+            </button>
+            <div id="error-message" class="mt-4 text-center text-red-600 font-medium"></div>
+        </form>
+
+        <div id="results" class="mt-10 hidden">
+            <div id="resumoContainer" class="mb-8"></div>
+            
+            <div class="grid grid-cols-1 gap-8">
+                <div>
+                    <h3 class="text-xl font-semibold mb-4 text-gray-800" id="planilhaTitle">Planilha de Evolução</h3>
+                    <div id="planilhaContainer" class="table-container"></div>
+                    <button id="downloadCsv" class="btn btn-primary mt-4">Baixar CSV</button>
+                </div>
+                <div>
+                     <h3 class="text-xl font-semibold mb-4 text-gray-800">Evolução do Saldo</h3>
+                    <div class="p-4 border rounded-lg bg-white">
+                        <canvas id="saldoChart" style="min-height: 300px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- Lógica da UI ---
+    const form = document.getElementById('simuladorForm');
+    const modoRadios = document.querySelectorAll('input[name="modo"]');
+    const saquesContainer = document.getElementById('saquesContainer');
+    const aliquotaFixaContainer = document.getElementById('aliquota_fixa_container');
+    const irModoSelect = document.getElementById('ir_modo');
+    const resultsDiv = document.getElementById('results');
+    const errorMessageDiv = document.getElementById('error-message');
+    const downloadBtn = document.getElementById('downloadCsv');
+
+    let chartInstance = null;
+    let csvData = '';
+    let csvFileName = '';
+
+    function toggleMode() {
+        if (document.getElementById('modoSaques').checked) {
+            saquesContainer.style.display = 'block';
+        } else {
+            saquesContainer.style.display = 'none';
+        }
+    }
+
+    function toggleIrModo() {
+        if (irModoSelect.value === 'fixa') {
+            aliquotaFixaContainer.style.display = 'block';
+        } else {
+            aliquotaFixaContainer.style.display = 'none';
+        }
+    }
+
+    modoRadios.forEach(radio => radio.addEventListener('change', toggleMode));
+    irModoSelect.addEventListener('change', toggleIrModo);
+    downloadBtn.addEventListener('click', () => {
+        const blob = new Blob([`\uFEFF${csvData}`], { type: 'text/csv;charset=utf-8-sig;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', csvFileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        errorMessageDiv.textContent = '';
+        resultsDiv.classList.add('hidden');
+
+        try {
+            const inputs = getInputs();
+            let df, resumo;
+            
+            if (inputs.modo === 'saques') {
+                [df, resumo] = simular_saques_meses_decimais(inputs);
+                 csvFileName = 'tesouro_ipca_saques.csv';
+            } else {
+                [df, resumo] = simular_resgate_unico_meses_decimais(inputs);
+                 csvFileName = 'tesouro_ipca_resgate_unico.csv';
+            }
+
+            displayResults(df, resumo, inputs.modo);
+            csvData = convertToCSV(df);
+            resultsDiv.classList.remove('hidden');
+
+        } catch (error) {
+            console.error(error);
+            errorMessageDiv.textContent = `Erro: ${error.message}. Verifique os valores de entrada.`;
+        }
+    });
+
+    // --- Funções de Utilidade e Cálculo (Traduzidas do Python) ---
+    const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+
+    function ptbr_to_float(txt) {
+        if (txt === null || txt === undefined) return 0.0;
+        const s = String(txt).trim().replace(/\./g, '').replace(',', '.');
+        const val = parseFloat(s);
+        if (isNaN(val)) throw new Error(`Valor inválido: "${txt}"`);
+        return val;
+    }
+
+    const fmt_money = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(round2(v)).replace('R$', '').trim();
+    const fmt_pct2 = (v) => `${(round2(v)).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%`;
+    const fmt_pct4 = (v) => `${(v).toLocaleString('pt-BR', {minimumFractionDigits: 4, maximumFractionDigits: 4})}%`;
+    
+    const taxa_mensal = (t_anual) => Math.pow(1.0 + t_anual, 1.0 / 12.0) - 1.0;
+    const taxa_mensal_ipca_real = (ipca_aa, real_aa) => Math.pow((1.0 + ipca_aa) * (1.0 + real_aa), 1.0 / 12.0) - 1.0;
+
+    function aliquota_regressiva_por_m(meses) {
+        if (meses <= 6) return 0.225;
+        if (meses <= 12) return 0.20;
+        if (meses <= 24) return 0.175;
+        return 0.15;
+    }
+
+    function aplicar_periodo(saldo, r_m, r_cust) {
+        const B = saldo * r_m;
+        const C = saldo + B;
+        const taxa_custodia_mes = C * r_cust;
+        const C_cust = C - taxa_custodia_mes;
+        return [B, C, taxa_custodia_mes, C_cust];
+    }
+
+    function aplicar_fracao(saldo, r_m, r_cust, fracao) {
+        const r_m_f = Math.pow(1.0 + r_m, fracao) - 1.0;
+        const r_cust_f = Math.pow(1.0 + r_cust, fracao) - 1.0;
+        const Bf = saldo * r_m_f;
+        const Cf = saldo + Bf;
+        const taxa_custodia_f = Cf * r_cust_f;
+        const Cf_cust = Cf - taxa_custodia_f;
+        return [r_m_f, r_cust_f, Bf, Cf, taxa_custodia_f, Cf_cust];
+    }
+
+    // --- Funções de Simulação ---
+    function simular_saques_meses_decimais(params) {
+        const { saldo_inicial, saque_inicial, meses_float, ipca_aa, real_aa, custodia_aa, usar_regressiva, aliquota_fixa, corrigir_saque_pelo_ipca, primeiro_saque_mes2, parar_quando_acabar } = params;
+
+        const ipca_m = taxa_mensal(ipca_aa);
+        const r_m = taxa_mensal_ipca_real(ipca_aa, real_aa);
+        const r_cust = taxa_mensal(custodia_aa);
+        const meses_int = Math.floor(meses_float);
+        const frac = round2(meses_float - meses_int);
+
+        let A = saldo_inicial;
+        let linhas = [];
+        let total_ir = 0.0, total_saques = 0.0, total_custodia = 0.0;
+        
+        for (let m = 1; m <= meses_int; m++) {
+            const [B, C, taxa_cust_mes, C_cust] = aplicar_periodo(A, r_m, r_cust);
+            total_custodia = round2(total_custodia + taxa_cust_mes);
+
+            let D = 0.0;
+            if (primeiro_saque_mes2) {
+                if (m > 1) {
+                    const fator = corrigir_saque_pelo_ipca ? Math.pow(1.0 + ipca_m, m - 2) : 1.0;
+                    D = saque_inicial * fator;
+                }
+            } else {
+                const fator = corrigir_saque_pelo_ipca ? Math.pow(1.0 + ipca_m, m - 1) : 1.0;
+                D = saque_inicial * fator;
+            }
+            D = Math.min(D, Math.max(0.0, C_cust));
+            
+            const prop = C_cust > 0 ? (D / C_cust) : 0.0;
+            const E = A * prop;
+            const F = Math.max(0.0, D - E);
+            
+            const aliq = usar_regressiva ? aliquota_regressiva_por_m(m) : aliquota_fixa;
+            const IR_m = F * aliq;
+            total_ir = round2(total_ir + IR_m);
+
+            const H = D - IR_m;
+            const I = C_cust - D;
+
+            linhas.push({
+                "Mes": m, "Fracao": 1.00, "A_Saldo_Inicial": A, "B_Rendimento": B, "C_Bruto_antes_Custodia": C, "Taxa_Custodia": taxa_cust_mes, "C_Apos_Custodia": C_cust, "D_Saque_Bruto": D, "E_Custo_Proporcional": E, "F_Rendimento_no_Saque": F, "Aliquota_%": aliq * 100.0, "G_IR_Mes": IR_m, "H_Saque_Liquido": H, "I_Saldo_Final": I, "r_m_%": r_m * 100.0, "cust_m_%": r_cust * 100.0,
+            });
+            
+            total_saques = round2(total_saques + D);
+            A = I;
+            if (parar_quando_acabar && I <= 1.0) break;
+        }
+
+        if (frac > 0 && (!parar_quando_acabar || A > 1.0)) {
+            const [r_m_f, r_cust_f, Bf, Cf, cust_f, Cf_cust] = aplicar_fracao(A, r_m, r_cust, frac);
+             linhas.push({
+                "Mes": meses_int + 1, "Fracao": frac, "A_Saldo_Inicial": A, "B_Rendimento": Bf, "C_Bruto_antes_Custodia": Cf, "Taxa_Custodia": cust_f, "C_Apos_Custodia": Cf_cust, "D_Saque_Bruto": 0.00, "E_Custo_Proporcional": 0.00, "F_Rendimento_no_Saque": 0.00, "Aliquota_%": 0.00, "G_IR_Mes": 0.00, "H_Saque_Liquido": 0.00, "I_Saldo_Final": Cf_cust, "r_m_%": r_m_f * 100.0, "cust_m_%": r_cust_f * 100.0,
+            });
+            total_custodia = round2(total_custodia + cust_f);
+            A = Cf_cust;
+        }
+
+        const resumo = { saldo_final: A, total_ir, total_saques, total_custodia, periodos_executados: linhas.length };
+        return [linhas, resumo];
+    }
+    
+    function simular_resgate_unico_meses_decimais(params) {
+        const { saldo_inicial, meses_float, ipca_aa, real_aa, custodia_aa, usar_regressiva, aliquota_fixa } = params;
+        const r_m = taxa_mensal_ipca_real(ipca_aa, real_aa);
+        const r_cust = taxa_mensal(custodia_aa);
+        const meses_int = Math.floor(meses_float);
+        const frac = round2(meses_float - meses_int);
+
+        let A = saldo_inicial;
+        let total_custodia = 0.0;
+        let linhas = [];
+
+        for (let m = 1; m <= meses_int; m++) {
+            const [B, C, taxa_cust_mes, C_cust] = aplicar_periodo(A, r_m, r_cust);
+            linhas.push({
+                "Mes": m, "Fracao": 1.00, "A_Saldo_Inicial": A, "B_Rendimento": B, "C_Bruto_antes_Custodia": C, "Taxa_Custodia": taxa_cust_mes, "C_Apos_Custodia": C_cust, "r_m_%": r_m * 100.0, "cust_m_%": r_cust * 100.0,
+            });
+            total_custodia = round2(total_custodia + taxa_cust_mes);
+            A = C_cust;
+        }
+
+        if (frac > 0) {
+            const [r_m_f, r_cust_f, Bf, Cf, cust_f, Cf_cust] = aplicar_fracao(A, r_m, r_cust, frac);
+            linhas.push({
+                "Mes": meses_int + 1, "Fracao": frac, "A_Saldo_Inicial": A, "B_Rendimento": Bf, "C_Bruto_antes_Custodia": Cf, "Taxa_Custodia": cust_f, "C_Apos_Custodia": Cf_cust, "r_m_%": r_m_f * 100.0, "cust_m_%": r_cust_f * 100.0,
+            });
+            total_custodia = round2(total_custodia + cust_f);
+            A = Cf_cust;
+        }
+
+        const bruto_final = A;
+        const lucro_total = Math.max(0.0, bruto_final - saldo_inicial);
+        const aliq_final = usar_regressiva ? aliquota_regressiva_por_m(meses_float) : aliquota_fixa;
+        const ir_final = round2(lucro_total * aliq_final);
+        const liquido_final = round2(bruto_final - ir_final);
+
+        const resumo = { valor_bruto_final: bruto_final, lucro_total, aliquota_final_pct: aliq_final * 100.0, ir_final, valor_liquido_final: liquido_final, total_custodia, periodos_executados: linhas.length };
+        return [linhas, resumo];
+    }
+
+    // --- Funções de Display ---
+    function getInputs() {
+        const inputs = {
+            modo: document.querySelector('input[name="modo"]:checked').value,
+            saldo_inicial: ptbr_to_float(document.getElementById('saldo_inicial').value),
+            meses_float: ptbr_to_float(document.getElementById('meses').value),
+            ipca_aa: ptbr_to_float(document.getElementById('ipca').value) / 100.0,
+            real_aa: ptbr_to_float(document.getElementById('real').value) / 100.0,
+            custodia_aa: ptbr_to_float(document.getElementById('custodia').value) / 100.0,
+            usar_regressiva: document.getElementById('ir_modo').value === 'regressiva',
+            aliquota_fixa: ptbr_to_float(document.getElementById('aliquota_fixa').value) / 100.0,
+            saque_inicial: ptbr_to_float(document.getElementById('saque_inicial').value),
+            primeiro_saque_mes2: document.getElementById('primeiro_saque_mes2').checked,
+            corrigir_saque_pelo_ipca: document.getElementById('corrigir_saque').checked,
+            parar_quando_acabar: document.getElementById('parar_quando_acabar').checked,
+        };
+        return inputs;
+    }
+
+    function displayResults(df, resumo, modo) {
+        displayResumo(resumo, modo);
+        displayPlanilha(df, modo);
+        displayChart(df);
+    }
+    
+    function displayResumo(resumo, modo) {
+        const container = document.getElementById('resumoContainer');
+        let items, title;
+        if (modo === 'saques') {
+            title = "Resumo (Saques)"
+            items = [
+                { Item: "Total IR (R$)", Valor: fmt_money(resumo.total_ir) },
+                { Item: "Total Custódia (R$)", Valor: fmt_money(resumo.total_custodia) },
+                { Item: "Total Saques Brutos (R$)", Valor: fmt_money(resumo.total_saques) },
+                { Item: "Saldo Final (R$)", Valor: fmt_money(resumo.saldo_final) },
+                { Item: "Períodos executados", Valor: resumo.periodos_executados }
+            ];
+        } else {
+            title = "Relatório de Resgate Final"
+            items = [
+                { Item: "Valor Bruto Final (R$)", Valor: fmt_money(resumo.valor_bruto_final) },
+                { Item: "Lucro Total (R$)", Valor: fmt_money(resumo.lucro_total) },
+                { Item: "Alíquota Aplicada (%)", Valor: fmt_pct2(resumo.aliquota_final_pct) },
+                { Item: "IR Final (R$)", Valor: fmt_money(resumo.ir_final) },
+                { Item: "Valor Líquido Final (R$)", Valor: fmt_money(resumo.valor_liquido_final) },
+                { Item: "Total Custódia (R$)", Valor: fmt_money(resumo.total_custodia) },
+                { Item: "Períodos executados", Valor: resumo.periodos_executados }
+            ];
+        }
+        
+        let tableHTML = `<h3 class="text-xl font-semibold mb-4 text-gray-800">${title}</h3>
+                         <div class="overflow-x-auto border rounded-lg">
+                            <table class="min-w-full bg-white">
+                                <thead class="bg-gray-50"><tr><th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th><th class="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th></tr></thead>
+                                <tbody class="divide-y divide-gray-200">`;
+        items.forEach(item => {
+            tableHTML += `<tr><td class="py-4 px-6 whitespace-nowrap text-sm font-medium text-gray-900">${item.Item}</td><td class="py-4 px-6 whitespace-nowrap text-sm text-gray-500">${item.Valor}</td></tr>`;
+        });
+        tableHTML += '</tbody></table></div>';
+        container.innerHTML = tableHTML;
+    }
+
+    function displayPlanilha(df, modo) {
+        const container = document.getElementById('planilhaContainer');
+        const titleEl = document.getElementById('planilhaTitle');
+        titleEl.textContent = modo === 'saques' ? 'Planilha (Saques)' : 'Evolução (Sem Saques)';
+
+        const headersSaques = ["Mês", "Fração", "Saldo Inicial", "Rendimento", "Saque Bruto", "Alíquota IR (%)", "IR Mês", "Saque Líquido", "Saldo Final"];
+        const keysSaques = ["Mes", "Fracao", "A_Saldo_Inicial", "B_Rendimento", "D_Saque_Bruto", "Aliquota_%", "G_IR_Mes", "H_Saque_Liquido", "I_Saldo_Final"];
+        
+        const headersUnico = ["Mês", "Fração", "Saldo Inicial", "Rendimento", "Taxa Custódia", "Saldo Final"];
+        const keysUnico = ["Mes", "Fracao", "A_Saldo_Inicial", "B_Rendimento", "Taxa_Custodia", "C_Apos_Custodia"];
+
+        const headers = modo === 'saques' ? headersSaques : headersUnico;
+        const keys = modo === 'saques' ? keysSaques : keysUnico;
+        
+        let tableHTML = '<table><thead><tr>';
+        headers.forEach(h => tableHTML += `<th>${h}</th>`);
+        tableHTML += '</tr></thead><tbody>';
+
+        df.forEach(row => {
+            tableHTML += '<tr>';
+            keys.forEach(key => {
+                const val = row[key];
+                const isMoney = ["A_", "B_", "C_", "D_", "E_", "F_", "G_", "H_", "I_", "Taxa_"].some(p => key.startsWith(p));
+                
+                let formattedVal;
+                if (typeof val !== 'number') {
+                    formattedVal = val;
+                } else if (key === 'Aliquota_%') {
+                    formattedVal = fmt_pct2(val);
+                } else if (isMoney) {
+                    formattedVal = fmt_money(val);
+                } else {
+                    formattedVal = val.toLocaleString('pt-BR');
+                }
+                
+                tableHTML += `<td>${formattedVal}</td>`;
+            });
+            tableHTML += '</tr>';
+        });
+        tableHTML += '</tbody></table>';
+        container.innerHTML = tableHTML;
+    }
+
+    function displayChart(df) {
+        const ctx = document.getElementById('saldoChart').getContext('2d');
+        const labels = df.map(row => row.Mes);
+        const data = df.map(row => round2(row.I_Saldo_Final ?? row.C_Apos_Custodia));
+
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Saldo Final (R$)',
+                    data: data,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false, // Alterado para false para melhor responsividade
+                scales: {
+                    y: {
+                        ticks: {
+                            callback: function(value, index, values) {
+                                return 'R$ ' + value.toLocaleString('pt-BR');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function convertToCSV(data) {
+        if (!data || data.length === 0) {
+            return '';
+        }
+        const headers = Object.keys(data[0]);
+        const headerRow = headers.join(';');
+        const rows = data.map(row => {
+            return headers.map(header => {
+                let cell = row[header];
+                if (typeof cell === 'number') {
+                    return String(cell).replace('.', ',');
+                }
+                return `"${cell}"`;
+            }).join(';');
+        });
+        return [headerRow, ...rows].join('\n');
+    }
+
+    // Inicialização da UI
+    toggleMode();
+    toggleIrModo();
+
+</script>
+
+</body>
+</html>
+
