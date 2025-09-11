@@ -204,17 +204,20 @@
             </div>
 
             <div class="grid grid-cols-1 gap-8">
+                
                 <div>
                     <h3 class="text-xl font-semibold mb-4 text-gray-800" id="planilhaTitle">Planilha de Evolução</h3>
                     <div id="planilhaContainer" class="table-container"></div>
                     <button id="downloadCsv" class="btn btn-primary mt-4">Baixar CSV</button>
                 </div>
+
                 <div>
                      <h3 class="text-xl font-semibold mb-4 text-gray-800" id="chartTitle">Evolução do Saldo</h3>
                     <div class="p-4 border rounded-lg bg-white">
                         <canvas id="saldoChart" style="min-height: 300px;"></canvas>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -452,12 +455,11 @@
                     const Custo_Proporcional_Saque = custo_proporcional_total * prop_saque;
                     const Rendimento_no_Saque_Nominal = Math.max(0.0, Saque_Bruto_Nominal - Custo_Proporcional_Saque);
                     
-                    if (params.ir_modo !== 'comecotas') {
-                        const aliq_saque = params.ir_modo === 'regressiva' ? aliquota_regressiva_por_m(m) : params.aliquota_fixa;
-                        Aliquota_IR_pct = aliq_saque * 100.0;
-                        IR_Saque_Nominal = Rendimento_no_Saque_Nominal * aliq_saque;
-                        totais.ir_saque += IR_Saque_Nominal;
-                    }
+                    const aliq_saque = (params.ir_modo === 'regressiva' || params.ir_modo === 'comecotas') ? aliquota_regressiva_por_m(m) : params.aliquota_fixa;
+                    Aliquota_IR_pct = aliq_saque * 100.0;
+                    IR_Saque_Nominal = Rendimento_no_Saque_Nominal * aliq_saque;
+                    totais.ir_saque += IR_Saque_Nominal;
+
                     custo_proporcional_total -= Custo_Proporcional_Saque;
                 }
                 totais.saques += Saque_Bruto_Nominal;
@@ -500,15 +502,16 @@
         };
         
         if (modo_movimentacao !== 'saques') {
-            const lucro_total = A_Nominal + totais.taxa - saldo_inicial - totais.aportes;
+            const lucro_total_bruto = A_Nominal + totais.taxa - saldo_inicial - totais.aportes;
+            const lucro_liquido_taxas = lucro_total_bruto - totais.taxa;
             let ir_final = 0;
 
             if (params.ir_modo === 'comecotas') {
-                const ir_total_devido = (lucro_total - totais.taxa) * aliquota_regressiva_por_m(meses_float);
+                const ir_total_devido = (lucro_liquido_taxas) * aliquota_regressiva_por_m(meses_float);
                 ir_final = Math.max(0, ir_total_devido - totais.ir_cc);
             } else {
                  const aliq_final = params.ir_modo === 'regressiva' ? aliquota_regressiva_por_m(meses_float) : params.aliquota_fixa;
-                 ir_final = lucro_total * aliq_final;
+                 ir_final = lucro_liquido_taxas * aliq_final;
             }
 
             resumo.ir_final_nominal = ir_final;
@@ -584,28 +587,25 @@
 
     function displayPlanilha(df, inputs, mode = 'nominal') {
         const container = document.getElementById('planilhaContainer');
-        const { modo_movimentacao, ir_modo } = inputs;
+        const { modo_movimentacao, tipo_taxa } = inputs;
+
+        const taxaHeader = tipo_taxa === 'custodia' ? 'Taxa Custódia' : 'Taxa Adm.';
         
-        // CORREÇÃO AQUI: A lista de chaves deve começar com 'Mes'
-        let headers = ["Mês", "Saldo Inicial", "Rendimento", "Taxa", "IR C.Cotas"];
-        let keys = ["Mes", `A_Saldo_Inicial`, `B_Rendimento`, `D_Taxa`, `F_IR_Come_Cotas`];
+        let headers = ["Mês", "Saldo Inicial", "Rendimento", taxaHeader, "IR C.Cotas"];
+        let keys = ["Mes", "A_Saldo_Inicial_Nominal", "B_Rendimento_Nominal", "D_Taxa_Nominal", "F_IR_Come_Cotas_Nominal"];
 
         if (modo_movimentacao === 'saques') {
-            headers.push("Saque Bruto");
-            keys.push(`Saque_Bruto`);
-            if (ir_modo !== 'comecotas') {
-                headers.push("Alíq. IR (%)", "IR Saque");
-                keys.push("Aliquota_IR_pct", `IR_Saque`);
-            }
+            headers.push("Saque Bruto", "Alíq. IR (%)", "IR Saque");
+            keys.push("Saque_Bruto_Nominal", "Aliquota_IR_pct", "IR_Saque_Nominal");
         } else if (modo_movimentacao === 'aportes') {
             headers.push("Aporte");
-            keys.push(`Aporte`);
+            keys.push("Aporte_Nominal");
         }
         headers.push("Saldo Final");
-        keys.push(`H_Saldo_Final`);
+        keys.push("H_Saldo_Final_Nominal");
 
         const suffix = mode === 'real' ? '_Real' : '_Nominal';
-        const finalKeys = keys.map(k => k.includes('Aliquota') || k === 'Mes' ? k : k + suffix);
+        const finalKeys = keys.map(k => k.includes('Aliquota') || k === 'Mes' ? k : k.replace('_Nominal', suffix));
         
         let tableHTML = '<table><thead><tr>';
         headers.forEach(h => tableHTML += `<th>${h}</th>`);
@@ -616,9 +616,13 @@
             finalKeys.forEach(key => {
                 const val = row[key];
                 let formattedVal = '';
-                if (key === 'Mes') formattedVal = val;
-                else if (key.includes('Aliquota')) formattedVal = val > 0 ? fmt_pct(val) : '-';
-                else if (typeof val === 'number') formattedVal = fmt_money(val);
+                if (key === 'Mes') {
+                    formattedVal = val;
+                } else if (key.includes('Aliquota')) {
+                    formattedVal = val > 0 ? fmt_pct(val) : '-';
+                } else if (typeof val === 'number') {
+                    formattedVal = fmt_money(val);
+                }
                 tableHTML += `<td>${formattedVal}</td>`;
             });
             tableHTML += '</tr>';
